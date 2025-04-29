@@ -2,3 +2,4 @@ streamlit
 langchain
 langgraph-codeact
 langchain-anthropic
+langchain-community
