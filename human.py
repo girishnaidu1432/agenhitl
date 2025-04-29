@@ -1,11 +1,11 @@
 import openai
 import streamlit as st
 from langchain.chat_models import ChatOpenAI
-from langchain.agents import initialize_agent, AgentType
-from langchain_core import tool
-from langgraph_codeact import create_codeact
-from tools import tools
-from langchain.agents import Tool
+from langchain.agents import initialize_agent, AgentType, Tool
+from langchain.agents import AgentExecutor
+from langchain.tools import Tool as LangChainTool  # Correct import for tools
+from langchain.agents import create_openai_functions_agent
+from tools import tools  # Your custom tools from tools.py
 
 # Set up OpenAI API
 openai.api_key = "your-openai-api-key"
@@ -14,14 +14,25 @@ openai.api_type = 'azure'
 openai.api_version = '2024-02-15-preview'
 deployment_name = 'gpt'
 
-# Initialize LangGraph Agent
-def initialize_langgraph_agent():
+# Initialize LangChain Agent
+def initialize_langchain_agent():
     model = ChatOpenAI(model="gpt-4", openai_api_key=openai.api_key)
-    code_act = create_codeact(model, tools, eval)
-    agent = code_act.compile(checkpointer=None)
+    
+    tools_list = [
+        LangChainTool(name=tool.__name__, func=tool)  # Use tools from your tools.py
+        for tool in tools
+    ]
+    
+    agent = initialize_agent(
+        tools=tools_list, 
+        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        llm=model,
+        verbose=True
+    )
+    
     return agent
 
-# Function to process user input
+# Function to process user input and interact with agent
 def process_input(user_input):
     memory_context = st.session_state.get('memory', [])
     
@@ -29,16 +40,16 @@ def process_input(user_input):
     memory_context.append({"role": "user", "content": user_input})
     st.session_state['memory'] = memory_context
     
-    agent = initialize_langgraph_agent()
+    agent = initialize_langchain_agent()
     messages = [{"role": "system", "content": "You are a helpful assistant."}] + memory_context
-    response = agent.invoke({"messages": messages})
+    response = agent.run(user_input)
     
     return response
 
 # Streamlit UI
 def display_chat():
     st.title("Human-in-the-Loop Agent")
-    
+
     if 'memory' not in st.session_state:
         st.session_state['memory'] = []
     
