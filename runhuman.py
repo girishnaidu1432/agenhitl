@@ -1,55 +1,101 @@
 import streamlit as st
-from langchain.chat_models import ChatAnthropic
-from langgraph_codeact import create_codeact
-from langgraph.checkpoint.memory import MemorySaver
-from tools import tools
+import math
 import builtins
 import contextlib
 import io
 from typing import Any
-from tools import tools  # No error now
 
+from langchain_core.tools import tool
+from langchain.chat_models import init_chat_model
+from langgraph_codeact import create_codeact
 
-st.set_page_config(page_title="CodeAct Agent with Stream", layout="wide")
-st.title("🧠 CodeAct Agent with Human-in-the-Loop")
+# ------------------------
+# Tools for computation
+# ------------------------
+@tool
+def add(a: float, b: float) -> float: return a + b
 
-# Code sandbox eval
-def sandbox_eval(code: str, _locals: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    original_keys = set(_locals.keys())
+@tool
+def subtract(a: float, b: float) -> float: return a - b
+
+@tool
+def multiply(a: float, b: float) -> float: return a * b
+
+@tool
+def divide(a: float, b: float) -> float: return a / b
+
+@tool
+def sin(a: float) -> float: return math.sin(a)
+
+@tool
+def cos(a: float) -> float: return math.cos(a)
+
+@tool
+def radians(a: float) -> float: return math.radians(a)
+
+@tool
+def exponentiation(a: float, b: float) -> float: return a ** b
+
+@tool
+def sqrt(a: float) -> float: return math.sqrt(a)
+
+@tool
+def ceil(a: float) -> float: return math.ceil(a)
+
+tools = [add, subtract, multiply, divide, sin, cos, radians, exponentiation, sqrt, ceil]
+
+# ------------------------
+# Simple eval sandbox (unsafe for production)
+# ------------------------
+def eval_code(code: str, _locals: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     try:
         with contextlib.redirect_stdout(io.StringIO()) as f:
             exec(code, builtins.__dict__, _locals)
-        result = f.getvalue() or "<code ran, no output printed to stdout>"
+        output = f.getvalue() or "<code ran, no output>"
     except Exception as e:
-        result = f"Error during execution: {repr(e)}"
+        output = f"Error: {repr(e)}"
+    return output, {}
 
-    new_keys = set(_locals.keys()) - original_keys
-    new_vars = {key: _locals[key] for key in new_keys}
-    return result, new_vars
+# ------------------------
+# Agent setup
+# ------------------------
+model = init_chat_model("claude-3-7-sonnet-latest", model_provider="anthropic")
+code_act = create_codeact(model, tools, eval_code)
+agent = code_act.compile()
 
-# Model
-model = ChatAnthropic(model="claude-3-7-sonnet-20240229", temperature=0)
+# ------------------------
+# Streamlit UI
+# ------------------------
+st.title("🔁 LangGraph CodeAct Agent")
 
-# Build agent
-code_act = create_codeact(model, tools, sandbox_eval)
-agent = code_act.compile(checkpointer=MemorySaver())
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# User input
-user_query = st.text_input("💬 Enter your question:", "What is sin(45°) + 3^2?")
+user_input = st.text_input("Enter your question:", key="input")
 
-if st.button("Run Agent"):
-    if user_query:
-        messages = [{"role": "user", "content": user_query}]
-        st.subheader("🤖 Agent Response")
+if st.button("Submit"):
+    if user_input:
+        st.session_state.chat_history.append(("User", user_input))
+        messages = [{"role": "user", "content": user_input}]
+        
+        st.info("Generating response...")
         response_placeholder = st.empty()
+        response_text = ""
 
-        full_response = ""
         for typ, chunk in agent.stream(
             {"messages": messages},
-            stream_mode=["values", "messages"],
-            config={"configurable": {"thread_id": 1}},
+            stream_mode=["values", "messages"]
         ):
             if typ == "messages":
-                content = chunk[0].content
-                full_response += content
-                response_placeholder.markdown(full_response)
+                response_text += chunk[0].content
+                response_placeholder.markdown(response_text)
+            elif typ == "values":
+                st.subheader("🔢 Computed Values")
+                st.json(chunk)
+
+        st.session_state.chat_history.append(("Agent", response_text))
+
+# Display history
+st.markdown("---")
+for role, msg in st.session_state.chat_history:
+    st.markdown(f"**{role}:** {msg}")
