@@ -1,10 +1,12 @@
-# streamlit_app.py
+# math_agents_streamlit.py
 
 import streamlit as st
+from typing import List
 from langchain.chat_models import AzureChatOpenAI
+from langchain.agents import initialize_agent, Tool
 from langchain.tools import tool
+from pydantic import BaseModel
 from langchain.memory import ConversationBufferMemory
-import json
 
 # ✅ Azure OpenAI Configuration
 openai_api_key = "14560021aaf84772835d76246b53397a"
@@ -19,98 +21,77 @@ llm = AzureChatOpenAI(
     openai_api_base=openai_api_base,
     openai_api_type=openai_api_type,
     openai_api_version=openai_api_version,
-    temperature=0.5
+    temperature=0
 )
 
-# ✅ Memory initialization
-if "memory" not in st.session_state:
-    st.session_state.memory = ConversationBufferMemory(return_messages=True)
+# ✅ Define input schema for math operations
+class MathInput(BaseModel):
+    numbers: List[float]
 
-# ✅ Math Tools
-@tool
-def add_numbers(args: str) -> str:
-    """Add two numbers. Input format: "5,3"."""
-    try:
-        a, b = map(float, args.split(","))
-        return f"Sum: {a + b}"
-    except:
-        return "❌ Error: Use format 'number1,number2'"
+# ✅ Define math tools
+@tool(args_schema=MathInput)
+def add_numbers(numbers: List[float]) -> float:
+    """Adds a list of numbers."""
+    return sum(numbers)
 
-@tool
-def subtract_numbers(args: str) -> str:
-    """Subtract two numbers. Input format: "10,4"."""
-    try:
-        a, b = map(float, args.split(","))
-        return f"Difference: {a - b}"
-    except:
-        return "❌ Error: Use format 'number1,number2'"
+@tool(args_schema=MathInput)
+def subtract_numbers(numbers: List[float]) -> float:
+    """Subtracts all numbers in order."""
+    result = numbers[0]
+    for n in numbers[1:]:
+        result -= n
+    return result
 
-@tool
-def multiply_numbers(args: str) -> str:
-    """Multiply two numbers. Input format: "2,6"."""
-    try:
-        a, b = map(float, args.split(","))
-        return f"Product: {a * b}"
-    except:
-        return "❌ Error: Use format 'number1,number2'"
+@tool(args_schema=MathInput)
+def multiply_numbers(numbers: List[float]) -> float:
+    """Multiplies a list of numbers."""
+    result = 1
+    for n in numbers:
+        result *= n
+    return result
 
-@tool
-def divide_numbers(args: str) -> str:
-    """Divide two numbers. Input format: "8,2"."""
-    try:
-        a, b = map(float, args.split(","))
-        if b == 0:
-            return "❌ Error: Cannot divide by zero"
-        return f"Quotient: {a / b}"
-    except:
-        return "❌ Error: Use format 'number1,number2'"
+@tool(args_schema=MathInput)
+def divide_numbers(numbers: List[float]) -> float:
+    """Divides numbers in sequence (first by second, then result by next, etc.)."""
+    result = numbers[0]
+    for n in numbers[1:]:
+        if n == 0:
+            return "Division by zero error"
+        result /= n
+    return result
 
-# ✅ Tool list
+# ✅ Initialize memory
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+# ✅ Tools list
 tools = [add_numbers, subtract_numbers, multiply_numbers, divide_numbers]
 
-# ✅ Supervisor Agent
-def supervisor_agent(prompt: str) -> str:
-    steps = []
-    prompt_lower = prompt.lower()
-
-    if "add" in prompt_lower:
-        steps.append(("Addition", add_numbers))
-    elif "subtract" in prompt_lower:
-        steps.append(("Subtraction", subtract_numbers))
-    elif "multiply" in prompt_lower:
-        steps.append(("Multiplication", multiply_numbers))
-    elif "divide" in prompt_lower:
-        steps.append(("Division", divide_numbers))
-    else:
-        return "❌ Please specify a math operation like add, subtract, multiply, or divide."
-
-    results = []
-    for desc, func in steps:
-        user_input = st.text_input(f"Step: {desc} - Enter numbers (e.g., 4,2)", key=desc)
-        if user_input:
-            result = func.run(user_input)
-            results.append(f"{desc}: {result}")
-            st.session_state.memory.chat_memory.add_user_message(f"{desc} of {user_input}")
-            st.session_state.memory.chat_memory.add_ai_message(result)
-            st.success(result)
-
-    return "\n".join(results)
+# ✅ Initialize agent
+agent = initialize_agent(
+    tools,
+    llm,
+    agent="chat-conversational-react-description",
+    memory=memory,
+    verbose=True
+)
 
 # ✅ Streamlit UI
-st.title("🧠 Math Agents with Human-in-the-Loop + Memory")
+st.set_page_config(page_title="🧮 Math Agent", layout="centered")
+st.title("🧠 Math Agent with Human in the Loop")
+st.write("Enter natural language math queries. Example: `add 3 and 5` or `divide 10 by 2`.")
 
-st.write("Enter a prompt like:")
-st.code("Add two numbers", language="text")
+# ✅ Chat input
+user_input = st.text_input("Your math question:")
 
-user_prompt = st.text_input("🔍 Your instruction")
+if user_input:
+    with st.spinner("🧠 Thinking..."):
+        try:
+            response = agent.run(user_input)
+            st.success(f"🔢 Answer: {response}")
+        except Exception as e:
+            st.error(f"⚠️ Error: {str(e)}")
 
-if user_prompt:
-    with st.spinner("Running..."):
-        result = supervisor_agent(user_prompt)
-        st.markdown("### ✅ Result")
-        st.write(result)
-
-st.markdown("---")
-st.markdown("### 🧠 Memory Log")
-for msg in st.session_state.memory.buffer:
-    st.markdown(f"- **{msg.type.upper()}**: {msg.content}")
+# ✅ Show memory
+with st.expander("🧠 Conversation History"):
+    for msg in memory.chat_memory.messages:
+        st.write(f"**{msg.type.title()}:** {msg.content}")
