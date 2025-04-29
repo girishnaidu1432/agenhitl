@@ -7,6 +7,8 @@ import builtins
 import contextlib
 import io
 from typing import Any
+from tools import tools  # No error now
+
 
 st.set_page_config(page_title="CodeAct Agent with Stream", layout="wide")
 st.title("🧠 CodeAct Agent with Human-in-the-Loop")
