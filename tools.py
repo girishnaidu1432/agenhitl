@@ -1,55 +1,68 @@
-import math
-from langchain_core.tools import Tool
+# tools.py
 
+import math
+from langchain_core.tools import tool
+
+@tool
 def add(a: float, b: float) -> float:
-    """Add two numbers"""
+    """Add two numbers."""
     return a + b
 
+@tool
 def subtract(a: float, b: float) -> float:
-    """Subtract b from a"""
+    """Subtract b from a."""
     return a - b
 
+@tool
 def multiply(a: float, b: float) -> float:
-    """Multiply two numbers"""
+    """Multiply two numbers."""
     return a * b
 
+@tool
 def divide(a: float, b: float) -> float:
-    """Divide a by b"""
+    """Divide a by b."""
     return a / b
 
+@tool
 def sin(a: float) -> float:
-    """Sine of a (radians)"""
+    """Sine of an angle in radians."""
     return math.sin(a)
 
+@tool
 def cos(a: float) -> float:
-    """Cosine of a (radians)"""
+    """Cosine of an angle in radians."""
     return math.cos(a)
 
-def radians(a: float) -> float:
-    """Convert degrees to radians"""
-    return math.radians(a)
+@tool
+def radians(degrees: float) -> float:
+    """Convert degrees to radians."""
+    return math.radians(degrees)
 
+@tool
 def exponentiation(a: float, b: float) -> float:
-    """a raised to the power of b"""
+    """Raise a to the power of b."""
     return a ** b
 
+@tool
 def sqrt(a: float) -> float:
-    """Square root of a"""
+    """Square root of a number."""
     return math.sqrt(a)
 
+@tool
 def ceil(a: float) -> float:
-    """Ceiling of a"""
+    """Ceiling of a number."""
     return math.ceil(a)
 
+# List of all tools
 tools = [
-    Tool.from_function(add),
-    Tool.from_function(subtract),
-    Tool.from_function(multiply),
-    Tool.from_function(divide),
-    Tool.from_function(sin),
-    Tool.from_function(cos),
-    Tool.from_function(radians),
-    Tool.from_function(exponentiation),
-    Tool.from_function(sqrt),
-    Tool.from_function(ceil),
+    add,
+    subtract,
+    multiply,
+    divide,
+    sin,
+    cos,
+    radians,
+    exponentiation,
+    sqrt,
+    ceil
 ]
