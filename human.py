@@ -1,66 +1,59 @@
 import openai
 import streamlit as st
 from langchain.chat_models import ChatOpenAI
-from langchain_core.tools import tool
+from langchain.agents import initialize_agent, AgentType
+from langchain_core import tool
 from langgraph_codeact import create_codeact
-from tools import tools  # Assuming tools.py is in the same directory
+from tools import tools
+from langchain.agents import Tool
 
-# Set up OpenAI API details
-openai.api_key = "14560021aaf84772835d76246b53397a"
+# Set up OpenAI API
+openai.api_key = "your-openai-api-key"
 openai.api_base = "https://amrxgenai.openai.azure.com/"
 openai.api_type = 'azure'
 openai.api_version = '2024-02-15-preview'
 deployment_name = 'gpt'
 
-# Initialize Streamlit app interface
-st.title('Human-in-the-loop Mathematical Agent')
-st.write('Ask any math-related question, and I will help solve it step by step.')
-
-# Initialize session state if it doesn't exist
-if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
-
-# Set up model
-model = ChatOpenAI(model="gpt-4", openai_api_key=openai.api_key)
-
-# Create a CodeAct agent
-code_act = create_codeact(model, tools, eval)
-agent = code_act.compile()
+# Initialize LangGraph Agent
+def initialize_langgraph_agent():
+    model = ChatOpenAI(model="gpt-4", openai_api_key=openai.api_key)
+    code_act = create_codeact(model, tools, eval)
+    agent = code_act.compile(checkpointer=None)
+    return agent
 
 # Function to process user input
 def process_input(user_input):
-    # Save user input to session state (acting as memory)
-    st.session_state.conversation_history.append({"role": "user", "content": user_input})
+    memory_context = st.session_state.get('memory', [])
+    
+    # Add user message to context
+    memory_context.append({"role": "user", "content": user_input})
+    st.session_state['memory'] = memory_context
+    
+    agent = initialize_langgraph_agent()
+    messages = [{"role": "system", "content": "You are a helpful assistant."}] + memory_context
+    response = agent.invoke({"messages": messages})
+    
+    return response
 
-    # Get agent response
-    response = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
-
-    # Save agent's response to session state (acting as memory)
-    st.session_state.conversation_history.append({
-        "role": "assistant", "content": response['messages'][0]['content']
-    })
-
-    # Display the response
-    st.write(f"Agent's Response: {response['messages'][0]['content']}")
-
-    return response['messages'][0]['content']
-
-# Main interaction loop
-user_input = st.text_input("Ask me anything:")
-
-if user_input:
-    with st.spinner("Processing..."):
+# Streamlit UI
+def display_chat():
+    st.title("Human-in-the-Loop Agent")
+    
+    if 'memory' not in st.session_state:
+        st.session_state['memory'] = []
+    
+    user_input = st.text_input("Enter your question:")
+    
+    if user_input:
         agent_response = process_input(user_input)
         
-        # Give feedback and ask for follow-up
-        follow_up = st.text_input("Would you like to ask something more or clarify?")
+        # Display agent's response
+        st.write(f"Agent: {agent_response}")
+        
+        # Allow user to give feedback or correct the agent
+        feedback = st.text_input("Provide feedback or corrections:")
+        if feedback:
+            st.session_state['memory'].append({"role": "assistant", "content": feedback})
 
-        if follow_up:
-            with st.spinner("Processing..."):
-                follow_up_response = process_input(follow_up)
-                st.write(f"Agent's Follow-up Response: {follow_up_response}")
-
-# Display the conversation history
-st.write("**Conversation History**:")
-for message in st.session_state.conversation_history:
-    st.write(f"{message['role'].capitalize()}: {message['content']}")
+if __name__ == "__main__":
+    display_chat()
