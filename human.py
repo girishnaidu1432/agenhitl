@@ -3,10 +3,8 @@ import streamlit as st
 from langchain.chat_models import ChatOpenAI
 from langchain_core.tools import tool
 from langgraph_codeact import create_codeact
-from langchain.agents import initialize_agent, AgentType
-from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory
 from tools import tools  # Assuming tools.py is in the same directory
+from langchain.memory import ConversationBufferMemory
 
 # Set up OpenAI API details
 openai.api_key = "14560021aaf84772835d76246b53397a"
@@ -19,7 +17,7 @@ deployment_name = 'gpt'
 st.title('Human-in-the-loop Mathematical Agent')
 st.write('Ask any math-related question, and I will help solve it step by step.')
 
-# Initialize memory
+# Initialize memory with ConversationBufferMemory
 memory = ConversationBufferMemory(memory_key="conversation_history", return_messages=True)
 
 # Set up model
@@ -32,16 +30,16 @@ agent = code_act.compile()
 # Function to process user input
 def process_input(user_input):
     # Add user message to memory
-    memory.save_context({"input": user_input})
+    memory.add_user_message(user_input)
 
     # Get agent response
     response = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
 
     # Display the response
     st.write(f"Agent's Response: {response['messages'][0]['content']}")
-    
+
     # Add response to memory
-    memory.save_context({"output": response['messages'][0]['content']})
+    memory.add_ai_message(response['messages'][0]['content'])
 
     return response['messages'][0]['content']
 
