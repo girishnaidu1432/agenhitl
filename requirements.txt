@@ -3,3 +3,5 @@ langchain
 langgraph-codeact
 langchain-anthropic
 langchain-community
+anthropic
+langchain-core
