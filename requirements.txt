@@ -2,7 +2,7 @@ streamlit
 langchain
 langgraph-codeact
 langchain-anthropic
-langchain-community
+langchain-community=0.3.22
 anthropic
 langchain-core
 openai
