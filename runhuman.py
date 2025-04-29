@@ -9,21 +9,47 @@ from langchain_core.tools import Tool
 from langchain.chat_models import init_chat_model
 from langgraph_codeact import create_codeact
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.tools import Tool
 
-# ------------------------
-# Define math tools manually
-# ------------------------
+def add(a: float, b: float) -> float:
+    """Add two numbers"""
+    return a + b
 
-def add(a: float, b: float) -> float: return a + b
-def subtract(a: float, b: float) -> float: return a - b
-def multiply(a: float, b: float) -> float: return a * b
-def divide(a: float, b: float) -> float: return a / b
-def sin(a: float) -> float: return math.sin(a)
-def cos(a: float) -> float: return math.cos(a)
-def radians(a: float) -> float: return math.radians(a)
-def exponentiation(a: float, b: float) -> float: return a ** b
-def sqrt(a: float) -> float: return math.sqrt(a)
-def ceil(a: float) -> float: return math.ceil(a)
+def subtract(a: float, b: float) -> float:
+    """Subtract b from a"""
+    return a - b
+
+def multiply(a: float, b: float) -> float:
+    """Multiply two numbers"""
+    return a * b
+
+def divide(a: float, b: float) -> float:
+    """Divide a by b"""
+    return a / b
+
+def sin(a: float) -> float:
+    """Calculate sine of a (in radians)"""
+    return math.sin(a)
+
+def cos(a: float) -> float:
+    """Calculate cosine of a (in radians)"""
+    return math.cos(a)
+
+def radians(a: float) -> float:
+    """Convert degrees to radians"""
+    return math.radians(a)
+
+def exponentiation(a: float, b: float) -> float:
+    """Raise a to the power of b"""
+    return a ** b
+
+def sqrt(a: float) -> float:
+    """Square root of a"""
+    return math.sqrt(a)
+
+def ceil(a: float) -> float:
+    """Ceiling of a"""
+    return math.ceil(a)
 
 tools = [
     Tool.from_function(add),
