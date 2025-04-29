@@ -29,17 +29,17 @@ agent = code_act.compile()
 
 # Function to process user input
 def process_input(user_input):
-    # Add user message to memory
-    memory.add_user_message(user_input)
+    # Save user input to memory
+    memory.save_context({"input": user_input, "output": None})
 
     # Get agent response
     response = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
 
+    # Save agent's response to memory
+    memory.save_context({"input": user_input, "output": response['messages'][0]['content']})
+
     # Display the response
     st.write(f"Agent's Response: {response['messages'][0]['content']}")
-
-    # Add response to memory
-    memory.add_ai_message(response['messages'][0]['content'])
 
     return response['messages'][0]['content']
 
