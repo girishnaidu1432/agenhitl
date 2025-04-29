@@ -1,73 +1,18 @@
 import streamlit as st
-import math
+from langchain.chat_models import ChatAnthropic
+from langgraph_codeact import create_codeact
+from langgraph.checkpoint.memory import MemorySaver
+from tools import tools
 import builtins
 import contextlib
 import io
 from typing import Any
 
-from langchain_core.tools import Tool
-from langchain.chat_models import init_chat_model
-from langgraph_codeact import create_codeact
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.tools import Tool
+st.set_page_config(page_title="CodeAct Agent with Stream", layout="wide")
+st.title("🧠 CodeAct Agent with Human-in-the-Loop")
 
-def add(a: float, b: float) -> float:
-    """Add two numbers"""
-    return a + b
-
-def subtract(a: float, b: float) -> float:
-    """Subtract b from a"""
-    return a - b
-
-def multiply(a: float, b: float) -> float:
-    """Multiply two numbers"""
-    return a * b
-
-def divide(a: float, b: float) -> float:
-    """Divide a by b"""
-    return a / b
-
-def sin(a: float) -> float:
-    """Calculate sine of a (in radians)"""
-    return math.sin(a)
-
-def cos(a: float) -> float:
-    """Calculate cosine of a (in radians)"""
-    return math.cos(a)
-
-def radians(a: float) -> float:
-    """Convert degrees to radians"""
-    return math.radians(a)
-
-def exponentiation(a: float, b: float) -> float:
-    """Raise a to the power of b"""
-    return a ** b
-
-def sqrt(a: float) -> float:
-    """Square root of a"""
-    return math.sqrt(a)
-
-def ceil(a: float) -> float:
-    """Ceiling of a"""
-    return math.ceil(a)
-
-tools = [
-    Tool.from_function(add),
-    Tool.from_function(subtract),
-    Tool.from_function(multiply),
-    Tool.from_function(divide),
-    Tool.from_function(sin),
-    Tool.from_function(cos),
-    Tool.from_function(radians),
-    Tool.from_function(exponentiation),
-    Tool.from_function(sqrt),
-    Tool.from_function(ceil),
-]
-
-# -------------------------
-# Unsafe code evaluator
-# -------------------------
-def eval_code(code: str, _locals: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+# Code sandbox eval
+def sandbox_eval(code: str, _locals: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     original_keys = set(_locals.keys())
     try:
         with contextlib.redirect_stdout(io.StringIO()) as f:
@@ -75,54 +20,34 @@ def eval_code(code: str, _locals: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         result = f.getvalue() or "<code ran, no output printed to stdout>"
     except Exception as e:
         result = f"Error during execution: {repr(e)}"
+
     new_keys = set(_locals.keys()) - original_keys
-    new_vars = {k: _locals[k] for k in new_keys}
+    new_vars = {key: _locals[key] for key in new_keys}
     return result, new_vars
 
-# -------------------------
-# LangGraph agent setup
-# -------------------------
-model = init_chat_model("claude-3-7-sonnet-latest", model_provider="anthropic")
-code_act = create_codeact(model, tools, eval_code)
+# Model
+model = ChatAnthropic(model="claude-3-7-sonnet-20240229", temperature=0)
+
+# Build agent
+code_act = create_codeact(model, tools, sandbox_eval)
 agent = code_act.compile(checkpointer=MemorySaver())
 
-# -------------------------
-# Streamlit UI
-# -------------------------
-st.set_page_config(page_title="LangGraph CodeAct Stream", layout="wide")
-st.title("LangGraph CodeAct Agent with Streaming")
-thread_id = 1
+# User input
+user_query = st.text_input("💬 Enter your question:", "What is sin(45°) + 3^2?")
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+if st.button("Run Agent"):
+    if user_query:
+        messages = [{"role": "user", "content": user_query}]
+        st.subheader("🤖 Agent Response")
+        response_placeholder = st.empty()
 
-user_input = st.text_input("Ask your question (math/physics/NLP)", key="user_input")
-
-if st.button("Send"):
-    if user_input:
-        messages = [{"role": "user", "content": user_input}]
-        st.session_state.chat_history.append(("You", user_input))
-
-        with st.spinner("Streaming response..."):
-            streamed_text = ""
-            response_placeholder = st.empty()
-            for typ, chunk in agent.stream(
-                {"messages": messages},
-                stream_mode=["values", "messages"],
-                config={"configurable": {"thread_id": thread_id}},
-            ):
-                if typ == "messages":
-                    streamed_text += chunk[0].content
-                    response_placeholder.markdown(streamed_text)
-                elif typ == "values":
-                    st.subheader("Computed Values")
-                    st.json(chunk)
-
-        st.session_state.chat_history.append(("Agent", streamed_text))
-
-# Display full chat history
-if st.session_state.chat_history:
-    st.markdown("---")
-    st.subheader("Chat History")
-    for role, message in st.session_state.chat_history:
-        st.markdown(f"**{role}:** {message}")
+        full_response = ""
+        for typ, chunk in agent.stream(
+            {"messages": messages},
+            stream_mode=["values", "messages"],
+            config={"configurable": {"thread_id": 1}},
+        ):
+            if typ == "messages":
+                content = chunk[0].content
+                full_response += content
+                response_placeholder.markdown(full_response)
