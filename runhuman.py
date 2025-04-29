@@ -5,45 +5,38 @@ import contextlib
 import io
 from typing import Any
 
-from langchain_core.tools import tool
+from langchain_core.tools import Tool
 from langchain.chat_models import init_chat_model
 from langgraph_codeact import create_codeact
 from langgraph.checkpoint.memory import MemorySaver
 
 # ------------------------
-# Define math tools
+# Define math tools manually
 # ------------------------
-@tool
+
 def add(a: float, b: float) -> float: return a + b
-
-@tool
 def subtract(a: float, b: float) -> float: return a - b
-
-@tool
 def multiply(a: float, b: float) -> float: return a * b
-
-@tool
 def divide(a: float, b: float) -> float: return a / b
-
-@tool
 def sin(a: float) -> float: return math.sin(a)
-
-@tool
 def cos(a: float) -> float: return math.cos(a)
-
-@tool
 def radians(a: float) -> float: return math.radians(a)
-
-@tool
 def exponentiation(a: float, b: float) -> float: return a ** b
-
-@tool
 def sqrt(a: float) -> float: return math.sqrt(a)
-
-@tool
 def ceil(a: float) -> float: return math.ceil(a)
 
-tools = [add, subtract, multiply, divide, sin, cos, radians, exponentiation, sqrt, ceil]
+tools = [
+    Tool.from_function(add),
+    Tool.from_function(subtract),
+    Tool.from_function(multiply),
+    Tool.from_function(divide),
+    Tool.from_function(sin),
+    Tool.from_function(cos),
+    Tool.from_function(radians),
+    Tool.from_function(exponentiation),
+    Tool.from_function(sqrt),
+    Tool.from_function(ceil),
+]
 
 # -------------------------
 # Unsafe code evaluator
