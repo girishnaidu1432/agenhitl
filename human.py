@@ -4,7 +4,6 @@ from langchain.chat_models import ChatOpenAI
 from langchain_core.tools import tool
 from langgraph_codeact import create_codeact
 from tools import tools  # Assuming tools.py is in the same directory
-from langchain.memory import ConversationBufferMemory
 
 # Set up OpenAI API details
 openai.api_key = "14560021aaf84772835d76246b53397a"
@@ -17,8 +16,9 @@ deployment_name = 'gpt'
 st.title('Human-in-the-loop Mathematical Agent')
 st.write('Ask any math-related question, and I will help solve it step by step.')
 
-# Initialize memory with ConversationBufferMemory
-memory = ConversationBufferMemory(memory_key="conversation_history", return_messages=True)
+# Initialize session state if it doesn't exist
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
 
 # Set up model
 model = ChatOpenAI(model="gpt-4", openai_api_key=openai.api_key)
@@ -29,14 +29,16 @@ agent = code_act.compile()
 
 # Function to process user input
 def process_input(user_input):
-    # Save user input to memory
-    memory.save_context({"input": user_input, "output": None})
+    # Save user input to session state (acting as memory)
+    st.session_state.conversation_history.append({"role": "user", "content": user_input})
 
     # Get agent response
     response = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
 
-    # Save agent's response to memory
-    memory.save_context({"input": user_input, "output": response['messages'][0]['content']})
+    # Save agent's response to session state (acting as memory)
+    st.session_state.conversation_history.append({
+        "role": "assistant", "content": response['messages'][0]['content']
+    })
 
     # Display the response
     st.write(f"Agent's Response: {response['messages'][0]['content']}")
@@ -60,4 +62,5 @@ if user_input:
 
 # Display the conversation history
 st.write("**Conversation History**:")
-st.write(memory.load_memory_variables({}))
+for message in st.session_state.conversation_history:
+    st.write(f"{message['role'].capitalize()}: {message['content']}")
